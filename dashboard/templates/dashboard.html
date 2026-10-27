@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <h1>Dashboard</h1>
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <span class="kpi-value">{{ total_cycles }}</span>
+            <span class="kpi-label">Cycles Today</span>
+        </div>
+        <div class="kpi-card">
+            <span class="kpi-value">{{ ok_cycles }}</span>
+            <span class="kpi-label">OK</span>
+        </div>
+    </div>
+
+    <h2>Stations</h2>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Code</th>
+                <th>Profile</th>
+                <th>Status</th>
+                <th>IP Address</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for station in stations %}
+            <tr>
+                <td>{{ station['code'] }}</td>
+                <td>{{ station['hardware_profile'] }}</td>
+                <td><span class="badge badge-{{ station['status']|lower }}">{{ station['status'] }}</span></td>
+                <td>{{ station['ip_address'] or 'N/A' }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4">No stations configured</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
