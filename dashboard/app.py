@@ -1,6 +1,5 @@
 """HALUNG Dashboard — Main Flask application."""
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
-from functools import wraps
 from datetime import datetime
 import json
 
@@ -8,20 +7,15 @@ from dashboard.config import (
     FLASK_SECRET, FLASK_HOST, FLASK_PORT, ADMIN_USER, ADMIN_PASSWORD,
     APP_VERSION, APP_NAME, EDGE_API_TOKEN
 )
+from dashboard.auth import login_required
 from dashboard.database import init_db, get_db
+from dashboard.routes import program_manager, edge_api
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.secret_key = FLASK_SECRET
-
-
-def login_required(f):
-    """Require login session."""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get("admin"):
-            return redirect(url_for("login"))
-        return f(*args, **kwargs)
-    return decorated_function
+app.register_blueprint(program_manager.bp)
+app.register_blueprint(edge_api.bp)
+init_db()
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -50,7 +44,7 @@ def logout():
 def dashboard():
     """Dashboard overview."""
     con = get_db()
-    stations = con.execute("SELECT * FROM stations ORDER BY code").fetchall()
+    stations = [program_manager.station_view(r) for r in con.execute("SELECT * FROM stations ORDER BY code")]
     cycles = con.execute(
         "SELECT COUNT(*) as total, "
         "SUM(CASE WHEN status='OK' THEN 1 ELSE 0 END) as ok "
@@ -80,7 +74,6 @@ def api_health():
 
 
 if __name__ == "__main__":
-    init_db()
     print(f"{APP_NAME} V{APP_VERSION}")
     print(f"Dashboard: http://127.0.0.1:{FLASK_PORT}")
     print(f"Login: {ADMIN_USER} / {ADMIN_PASSWORD}")

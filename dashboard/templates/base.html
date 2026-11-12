@@ -12,6 +12,7 @@
         <div class="navbar-menu">
             {% if session.get('admin') %}
             <a href="{{ url_for('dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('program_manager.page') }}">Program Manager</a>
             <a href="{{ url_for('logout') }}">Logout</a>
             {% endif %}
         </div>
@@ -32,5 +33,6 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block scripts %}{% endblock %}
 </body>
 </html>

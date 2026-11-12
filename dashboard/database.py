@@ -12,6 +12,46 @@ def get_db() -> sqlite3.Connection:
     return con
 
 
+def _add_columns(con, table, columns):
+    """Add missing columns (non-destructive migration; existing data is kept)."""
+    have = {r["name"] for r in con.execute(f"PRAGMA table_info({table})")}
+    for name, ddl in columns.items():
+        if name not in have:
+            con.execute(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
+
+
+def _migrate(con):
+    """Program Manager / Edge API schema additions."""
+    _add_columns(con, "manual_programs", {
+        "layout": "TEXT",
+        "variant": "TEXT",
+        "version": "INTEGER NOT NULL DEFAULT 1",
+    })
+    _add_columns(con, "stations", {
+        "assigned_version": "INTEGER",      # version the dashboard wants active
+        "active_program_id": "INTEGER",     # program acknowledged by the Raspberry
+        "active_version": "INTEGER",
+        "active_ack_at": "TEXT",
+    })
+    _add_columns(con, "cycles", {"client_uid": "TEXT"})
+    con.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_cycles_uid ON cycles(client_uid) "
+                "WHERE client_uid IS NOT NULL")
+    con.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS program_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            program_id INTEGER NOT NULL,
+            version INTEGER NOT NULL,
+            changed_at TEXT NOT NULL,
+            changed_by TEXT,
+            action TEXT NOT NULL,
+            snapshot_json TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_program_history ON program_history(program_id, version);
+        """
+    )
+
+
 def init_db():
     """Initialize database schema."""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -129,6 +169,8 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_nas_jobs_status ON nas_jobs(status, created_at);
     """
     )
+
+    _migrate(con)
 
     # Insert default settings if empty
     if con.execute("SELECT COUNT(*) FROM settings").fetchone()[0] == 0:

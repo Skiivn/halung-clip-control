@@ -211,3 +211,9 @@ body {
     background-color: #6c757d;
     color: white;
 }
+
+/* Program Manager */
+.pm-layout { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; }
+.pm-panel label { display: block; margin: 6px 0; }
+.points-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 4px; margin: 8px 0; }
+.points-grid .pt { margin: 0; }
