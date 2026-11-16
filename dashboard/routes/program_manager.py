@@ -32,6 +32,7 @@ def station_view(row):
         d.get("manual_program_id") and d.get("active_program_id") == d["manual_program_id"]
         and d.get("active_version") == d.get("assigned_version"))
     d["state"] = json.loads(d["state_json"]) if d.get("state_json") else None
+    d["hardware_status"] = (d["state"] or {}).get("hardware_status", "UNKNOWN")
     return d
 
 

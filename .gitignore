@@ -41,6 +41,8 @@ data/
 .env
 config.json
 secrets.json
+raspberry/config/station.json
+raspberry/data/
 
 # OS
 .DS_Store

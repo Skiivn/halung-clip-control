@@ -22,7 +22,8 @@
             <tr>
                 <th>Code</th>
                 <th>Profile</th>
-                <th>Status</th>
+                <th>Agent</th>
+                <th>Hardware</th>
                 <th>IP Address</th>
             </tr>
         </thead>
@@ -32,10 +33,11 @@
                 <td>{{ station['code'] }}</td>
                 <td>{{ station['hardware_profile'] }}</td>
                 <td><span class="badge badge-{{ station['status']|lower }}">{{ station['status'] }}</span></td>
+                <td>{{ station['hardware_status'] }}</td>
                 <td>{{ station['ip_address'] or 'N/A' }}</td>
             </tr>
             {% else %}
-            <tr><td colspan="4">No stations configured</td></tr>
+            <tr><td colspan="5">No stations configured</td></tr>
             {% endfor %}
         </tbody>
     </table>

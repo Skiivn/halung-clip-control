@@ -31,7 +31,7 @@ cd halung-clip-control
 ```powershell
 # Windows PowerShell
 py -3 -m venv .venv
-.\.\ venv\Scripts\Activate.ps1
+.\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
@@ -103,13 +103,48 @@ halung-clip-control/
 ## Testing
 
 ```bash
-# Unit tests (state machine, config contract, I/O adapter)
-pytest raspberry/tests/ -v
+# Unit tests
+pytest tests/ -v
 
 # Compile check (Python syntax)
 python -m py_compile dashboard/app.py raspberry/agent.py
 ```
 
 ---
+
+## Raspberry Edge Agent (Dashboard communication)
+
+The agent communicates with the Dashboard using Python's standard-library HTTP
+client. It polls the Dashboard, validates and atomically saves assigned
+programs, acknowledges the exact version received, and stores cycle records in
+a local SQLite outbox until the Dashboard confirms receipt. Cycle uploads are
+idempotent across retries.
+
+1. On Windows, copy `.env.example` to `.env`, set a long random
+   `HALUNG_EDGE_API_TOKEN`, and set a non-default admin password.
+2. On the Raspberry, clone the repository and create its private station
+   configuration:
+
+   ```bash
+   cp raspberry/config/station.example.json raspberry/config/station.json
+   nano raspberry/config/station.json
+   chmod 600 raspberry/config/station.json
+   ```
+
+3. Set `station_code`, `hardware_profile`, the Windows PC's reachable
+   `dashboard_url`, and the same token configured in the Dashboard. Keep the
+   actual `station.json` out of Git.
+4. Install and start the system service from the repository directory:
+
+   ```bash
+   bash scripts/install_raspberry_agent.sh
+   sudo journalctl -u halung-edge-agent.service -f
+   ```
+
+The current agent phase is **network/configuration synchronization only**. It
+does not yet drive MCP23017, GPIO, relays, switches, LEDs, or LCD, and reports
+`hardware_status: NOT_CONFIGURED`; do not use it to run a production station.
+The next step is implementing the hardware adapter and local Clip Test engine,
+then connecting engine cycle results to `queue_cycle_report`.
 
 **Built from scratch — V12 — October 2026**

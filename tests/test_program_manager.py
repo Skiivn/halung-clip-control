@@ -68,7 +68,9 @@ def test_edge_flow_assign_fetch_ack_verify(client):
     assert client.get("/api/stations/CT-06/program-status").get_json()["verified"] is False
 
     assert client.post("/api/edge/CT-06/heartbeat", json={"state": "READY"}).status_code == 401
-    hb = client.post("/api/edge/CT-06/heartbeat", json={"state": "READY"}, headers=EDGE).get_json()
+    hb = client.post("/api/edge/CT-06/heartbeat",
+                     json={"state": "NOT_CONFIGURED", "hardware_status": "NOT_CONFIGURED"},
+                     headers=EDGE).get_json()
     assert hb["config_update_needed"] is True
     cfg = client.get("/api/edge/CT-06/config", headers=EDGE).get_json()
     assert cfg["program"]["required_switches"] == [1, 2, 3]
@@ -80,6 +82,9 @@ def test_edge_flow_assign_fetch_ack_verify(client):
                        headers=EDGE).status_code == 200
     st = client.get("/api/stations/CT-06/program-status").get_json()
     assert st["verified"] is True and st["status"] == "ONLINE"
+    station = client.get("/api/stations").get_json()["stations"][0]
+    assert station["status"] == "ONLINE"
+    assert station["hardware_status"] == "NOT_CONFIGURED"
 
     # editing the program bumps the version -> must be re-sent
     client.put(f"/api/programs/{p['id']}", json={**p, "required_switches": [1]})
@@ -90,11 +95,13 @@ def test_edge_flow_assign_fetch_ack_verify(client):
 def test_cycle_upload_is_idempotent(client):
     mk_station(client)
     body = {"cycles": [{"client_uid": "u1", "status": "OK", "duration_s": 12.5},
-                       {"client_uid": "u1", "status": "OK", "duration_s": 12.5},
-                       {"status": "OK"}]}
+                       {"client_uid": "u1", "status": "OK", "duration_s": 12.5}]}
     for _ in range(2):
         r = client.post("/api/edge/CT-06/cycles", json=body, headers=EDGE).get_json()
         assert r["accepted"] == ["u1", "u1"]
+    invalid = client.post("/api/edge/CT-06/cycles", json={"cycles": [{"status": "OK"}]},
+                          headers=EDGE)
+    assert invalid.status_code == 400
     from dashboard.database import get_db
     con = get_db()
     assert con.execute("SELECT COUNT(*) FROM cycles").fetchone()[0] == 1

@@ -2,6 +2,12 @@
 
 ## System Overview
 
+**Current implementation boundary:** the Raspberry agent currently provides
+Dashboard networking and program synchronization only. GPIO/I²C drivers, LCD,
+relay control, and the production Clip Test state machine are not implemented
+yet. The hardware profiles and state-machine flow below describe the target,
+not hardware functionality currently running on the Pi.
+
 ```
 ┌─────────────────────┐
 │  Windows PC         │
@@ -12,16 +18,13 @@
 │  - Reports/NAS      │
 └──────────┬──────────┘
            │ REST API
-           │ (X-Halung-Token)
+           │ Authorization: Bearer <token>
            │
     ┌──────▼──────┐
     │  Raspberry Pi 5
     │  Edge Agent
     ├──────────────┤
-    │ State Machine│  Cycle: READY → LOCK → CHECKING → VALIDATED
-    │ I²C + GPIO   │
-    │ LCD Display  │
-    │ Heartbeat    │
+    │ Network Agent│  Heartbeat, programs, durable result outbox
     └──────────────┘
 ```
 
@@ -49,8 +52,8 @@
 
 ### Heartbeat (Raspberry → Dashboard)
 ```
-POST /api/edge/stations/<station_code>/heartbeat
-Header: X-Halung-Token: <api_token>
+POST /api/edge/<station_code>/heartbeat
+Header: Authorization: Bearer <api_token>
 
 {
   "state": "READY",
@@ -63,36 +66,42 @@ Header: X-Halung-Token: <api_token>
 
 ### Get Configuration (Raspberry → Dashboard)
 ```
-GET /api/edge/stations/<station_code>/config
-Header: X-Halung-Token: <api_token>
+GET /api/edge/<station_code>/config
+Header: Authorization: Bearer <api_token>
 
 Response:
 {
   "ok": true,
-  "config": {
-    "hardware": { /* MCP/GPIO mapping */ },
-    "points": [ /* SW/LED channels */ ]
+  "program": {
+    "program_id": 1,
+    "version": 1,
+    "required_switches": [1, 3, 5]
   }
 }
 ```
 
-### Report Cycle (Raspberry → Dashboard)
+The Raspberry validates the program against its hardware profile, saves it
+atomically, then calls `POST /api/edge/<station_code>/program-ack`. The
+Dashboard marks that version active only after this acknowledgement.
+
+### Report Cycles (Raspberry → Dashboard)
 ```
-POST /api/edge/stations/<station_code>/cycles
-Header: X-Halung-Token: <api_token>
+POST /api/edge/<station_code>/cycles
+Header: Authorization: Bearer <api_token>
 
 {
-  "status": "OK",
-  "cycle_time_seconds": 45.3,
-  "swlock_time": "2026-10-27T14:30:15Z",
-  "butok_time": "2026-10-27T14:31:00Z",
-  "actual_per_hour": 79.3,
-  "efficiency": 88.1,
-  "operator": "Oussama"
+  "cycles": [{
+    "client_uid": "stable-uuid",
+    "status": "OK",
+    "duration_s": 45.3
+  }]
 }
 ```
 
-## State Machine
+The Raspberry retains unacknowledged cycle records in a local SQLite outbox.
+Resending a record with the same `client_uid` does not duplicate production.
+
+## Planned Clip Test State Machine
 
 ### States
 - **READY** — Waiting for SWLOCK press
@@ -159,28 +168,27 @@ ERROR
 
 2. **Raspberry agent starts:**
    - Loads local config (station_code, dashboard_url, api_token)
-   - Initializes hardware (MCP, GPIO, LCD)
-   - Enters main loop
+   - Starts Dashboard synchronization (hardware is not initialized in this phase)
 
-3. **Heartbeat (every 1 second):**
-   - Raspberry sends state + I/O status
+3. **Heartbeat (configurable; default 5 seconds):**
+   - Raspberry sends agent and hardware configuration status
    - Dashboard records health
    - Raspberry checks for commands
 
-4. **Config refresh (every 5 seconds):**
-   - Raspberry fetches active program if changed
-   - Loads new hardware mapping
-   - Resets state machine
+4. **Program delivery:**
+   - Dashboard signals that an assigned version differs from the acknowledged one
+   - Raspberry validates profile compatibility, atomically saves, then acknowledges
 
 5. **Cycle completion:**
-   - Raspberry sends cycle report
+   - The future local engine queues a cycle report in SQLite
+   - Raspberry sends buffered reports and retains any not acknowledged
    - Dashboard records OK/NOK, calculates KPIs
    - Updates production counters
 
 ## Error Handling
 
 - **I²C failure:** Log error, set state to ERROR, freeze I/O
-- **Network timeout:** Buffer cycles locally, sync on reconnect
+- **Network timeout:** Keep cycle records in the local SQLite outbox and sync on reconnect
 - **Invalid config:** Revert to last known good, alert Dashboard
 - **Unexpected button:** Set WRONG_CLIP, wait for release
 - **LED/relay stuck:** Log hardware error, continue (graceful degrade)

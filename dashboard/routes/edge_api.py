@@ -94,6 +94,18 @@ def cycles(code):
     items = body.get("cycles")
     if not isinstance(items, list):
         return jsonify(ok=False, error="cycles must be a list"), 400
+    for index, item in enumerate(items):
+        if not isinstance(item, dict):
+            return jsonify(ok=False, error=f"cycle {index} must be an object"), 400
+        if not isinstance(item.get("client_uid"), str) or not item["client_uid"].strip():
+            return jsonify(ok=False, error=f"cycle {index} requires client_uid"), 400
+        if item.get("status") not in ("OK", "NOK", "INTERRUPTED"):
+            return jsonify(ok=False, error=f"cycle {index} has an invalid status"), 400
+        duration = item.get("duration_s")
+        if duration is not None and (
+            isinstance(duration, bool) or not isinstance(duration, (int, float)) or duration < 0
+        ):
+            return jsonify(ok=False, error=f"cycle {index} has an invalid duration_s"), 400
     con = get_db()
     st = _station(con, code)
     if st is None:
@@ -102,9 +114,7 @@ def cycles(code):
     accepted = []
     for c in items:
         uid = c.get("client_uid")
-        status = c.get("status", "OK")
-        if not uid or status not in ("OK", "NOK", "INTERRUPTED"):
-            continue
+        status = c["status"]
         cur = con.execute(
             "INSERT OR IGNORE INTO cycles(cycle_time, station_code, variant_code, variant_ref, "
             "cycle_time_seconds, status, failure_code, details_json, client_uid, swlock_time, butok_time) "

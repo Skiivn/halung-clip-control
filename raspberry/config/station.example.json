@@ -1,0 +1,10 @@
+{
+  "station_code": "CT-06",
+  "hardware_profile": "HALUNG_3IO_BENCH_V1",
+  "dashboard_url": "http://192.168.101.90:8080",
+  "api_token": "REPLACE_WITH_THE_SAME_RANDOM_TOKEN_AS_HALUNG_EDGE_API_TOKEN",
+  "heartbeat_seconds": 5,
+  "request_timeout_seconds": 3,
+  "active_program_path": "raspberry/data/active_program.json",
+  "outbox_path": "raspberry/data/agent.sqlite3"
+}

@@ -93,6 +93,7 @@
       const verified = s.program_verified ? '✔ verified' : (s.manual_program_id ? '… pending' : '—');
       return `<tr><td>${esc(s.code)}</td><td>${esc(s.hardware_profile)}</td>
         <td><span class="badge badge-${s.status.toLowerCase()}">${s.status}</span></td>
+        <td>${esc(s.hardware_status)}</td>
         <td><select data-sel="${esc(s.code)}"><option value="">—</option>${opts}</select> v${s.assigned_version ?? '—'}</td>
         <td>${esc(name(s.active_program_id))} v${s.active_version ?? '—'} ${verified}</td>
         <td><button class="btn" data-send="${esc(s.code)}">Send</button></td></tr>`;
